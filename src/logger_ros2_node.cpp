@@ -1,3 +1,5 @@
+#include "logger_ros2_node/logger_ros2_node.hpp"
+
 #include "rclcpp/rclcpp.hpp"
 #include "std_msgs/msg/string.hpp"
 
@@ -15,31 +17,20 @@
 
 #include <ck_ros2_base_msgs_node/msg/robot_status.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
+#include <boost/process.hpp>
 
 #define NODE_NAME "logger_ros2_node"
 
-std::string exec(const char* cmd)
-{
-	std::array<char, 128> buffer;
-	std::string result;
-	std::unique_ptr<FILE, decltype(&pclose)> pipe(popen(cmd, "r"), pclose);
-	if (!pipe)
-	{
-		throw std::runtime_error("popen() failed!");
-	}
-	while (fgets(buffer.data(), buffer.size(), pipe.get()))
-	{
-		result += buffer.data();
-	}
-	return result;
-}
-
-class LocalNode : public rclcpp::Node
+class LocalNode : public ParameterizedNode
 {
 public:
-    LocalNode() : rclcpp::Node(NODE_NAME)
+    LocalNode() : ParameterizedNode(NODE_NAME)
     {
         robot_status_subscriber = this->create_subscription<ck_ros2_base_msgs_node::msg::RobotStatus>("/RobotStatus", 1, std::bind(&LocalNode::robot_status_callback, this, std::placeholders::_1));
+
+		std::stringstream tmp_file_name;
+		tmp_file_name << Parameters.log_path.as_string() << "/" << Parameters.log_prefix.as_string();
+		MCAP_file_name = tmp_file_name.str();
     }
 
     ~LocalNode()
@@ -50,8 +41,12 @@ public:
 
 	void stop_ros_bag()
 	{
-		RCLCPP_INFO(this->get_logger(), "Stopping the recording");
-		system("pkill -2 rosbag");
+		RCLCPP_INFO(this->get_logger(), "Stopping the recording...");
+		pid_t pid = log_process.id ();
+		kill (pid, SIGINT);
+		log_process.join();
+		system("sudo sync");
+		RCLCPP_INFO(this->get_logger(), "Stopped the recording!");
 	}
 
 	boost::posix_time::ptime rclcpp_time_to_boost_time(rclcpp::Time input_time)
@@ -65,26 +60,31 @@ public:
 
 	void start_ros_bag()
 	{
-		const std::string DEFAULT_BAG_NAME = "/mnt/working/ros_log_";
+		if (log_process.running())
+		{
+			stop_ros_bag();
+			start_ros_bag();
+		}
+		else
+		{
+			boost::posix_time::ptime my_posix_time = rclcpp_time_to_boost_time(this->get_clock()->now());
+			std::string date_string = boost::posix_time::to_iso_extended_string(my_posix_time);
 
-		boost::posix_time::ptime my_posix_time = rclcpp_time_to_boost_time(this->get_clock()->now());
-		std::string date_string = boost::posix_time::to_iso_extended_string(my_posix_time);
+			std::stringstream log_command;
+			log_command << "bag record -s mcap --tcpnodelay -a -x '/MotorControl$|/MotorConfiguration$' --split --duration 5m --max-splits 1 --repeat-latched -O " << MCAP_file_name << date_string << ".mcap";
 
-		std::stringstream s;
-		s << "rosbag record --tcpnodelay -a -x '/MotorControl$|/MotorConfiguration$' --split --duration 5m --max-splits 1 --repeat-latched -O " << DEFAULT_BAG_NAME << date_string << ".bag &";
+			log_process = boost::process::child(boost::process::search_path("ros2"), log_command.str());
 
-		system(s.str().c_str());
-
-		RCLCPP_INFO(this->get_logger(), "Starting a recording at: %s", s.str().c_str());
-	}
-
-	void sync_fs()
-	{
-		system("sudo sync");
+			RCLCPP_INFO(this->get_logger(), "Starting a recording at: %s", log_command.str().c_str());
+		}
 	}
 
 private:
     rclcpp::Subscription<ck_ros2_base_msgs_node::msg::RobotStatus>::SharedPtr robot_status_subscriber;
+
+	boost::process::child log_process;
+
+	std::string MCAP_file_name;
 
 	void robot_status_callback (const ck_ros2_base_msgs_node::msg::RobotStatus &msg)
 	{
@@ -95,10 +95,9 @@ private:
 			time_in_disabled = this->get_clock()->now();
 		}
 
-		if (time_in_disabled != rclcpp::Time(0) && (this->get_clock()->now() - time_in_disabled) > rclcpp::Duration::from_seconds(10))
+		if (time_in_disabled != rclcpp::Time(0) && (this->get_clock()->now() - time_in_disabled) > rclcpp::Duration::from_seconds(Parameters.disabled_log_restart_time.as_double()))
 		{
 			stop_ros_bag();
-			sync_fs();
 			start_ros_bag();
 			time_in_disabled = rclcpp::Time(0);
 		}
@@ -113,7 +112,6 @@ int main(int argc, char **argv)
 	node->start_ros_bag();
     rclcpp::spin(node);
 	node->stop_ros_bag();
-	node->sync_fs();
     rclcpp::shutdown();
     return 0;
 }
