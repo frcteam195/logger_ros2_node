@@ -60,12 +60,7 @@ public:
 
 	void start_ros_bag()
 	{
-		if (log_process.running())
-		{
-			stop_ros_bag();
-			start_ros_bag();
-		}
-		else
+		if (!log_process.running())
 		{
 			boost::posix_time::ptime my_posix_time = rclcpp_time_to_boost_time(this->get_clock()->now());
 			std::string date_string = boost::posix_time::to_iso_extended_string(my_posix_time);
@@ -76,6 +71,10 @@ public:
 			log_process = boost::process::child(boost::process::search_path("ros2"), log_command.str());
 
 			RCLCPP_INFO(this->get_logger(), "Starting a recording at: %s", log_command.str().c_str());
+		}
+		else
+		{
+			RCLCPP_ERROR(this->get_logger(), "Failed to start log! ROS2 bag is already running...");
 		}
 	}
 
