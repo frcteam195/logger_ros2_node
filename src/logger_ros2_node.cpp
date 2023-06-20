@@ -66,7 +66,7 @@ public:
 			std::string date_string = boost::posix_time::to_iso_extended_string(my_posix_time);
 
 			std::stringstream log_command;
-			log_command << "bag record -s mcap --tcpnodelay -a -x '/MotorControl$|/MotorConfiguration$' --split --duration 5m --max-splits 1 --repeat-latched -O " << MCAP_file_name << date_string << ".mcap";
+			log_command << "bag record -s mcap --tcpnodelay -a -x '/MotorControl$|/MotorConfiguration$' --split --duration 5m --max-splits 1 --repeat-latched -O " << MCAP_file_name << date_string << ".mcap --storage-preset-profile fastwrite";
 
 			log_process = boost::process::child(boost::process::search_path("ros2"), log_command.str());
 
