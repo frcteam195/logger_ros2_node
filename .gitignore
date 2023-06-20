@@ -1,3 +1,8 @@
+ros2_ws/
+__pycache__/
+generated/
+
+
 # Created by https://www.gitignore.io/api/c++,java,linux,macos,gradle,windows,visualstudiocode
 
 ### C++ ###

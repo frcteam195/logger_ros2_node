@@ -29,7 +29,7 @@ public:
         robot_status_subscriber = this->create_subscription<ck_ros2_base_msgs_node::msg::RobotStatus>("/RobotStatus", 1, std::bind(&LocalNode::robot_status_callback, this, std::placeholders::_1));
 
 		std::stringstream tmp_file_name;
-		tmp_file_name << Parameters.log_path.as_string() << "/" << Parameters.log_prefix.as_string();
+		tmp_file_name << Parameters.log_path << "/" << Parameters.log_prefix;
 		MCAP_file_name = tmp_file_name.str();
     }
 
@@ -94,7 +94,7 @@ private:
 			time_in_disabled = this->get_clock()->now();
 		}
 
-		if (time_in_disabled != rclcpp::Time(0) && (this->get_clock()->now() - time_in_disabled) > rclcpp::Duration::from_seconds(Parameters.disabled_log_restart_time.as_double()))
+		if (time_in_disabled != rclcpp::Time(0) && (this->get_clock()->now() - time_in_disabled) > rclcpp::Duration::from_seconds(Parameters.disabled_log_restart_time))
 		{
 			stop_ros_bag();
 			start_ros_bag();
