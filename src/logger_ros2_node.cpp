@@ -19,7 +19,11 @@
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/process.hpp>
 
+#include "ck_utilities_ros2_node/node_handle.hpp"
+
 #define NODE_NAME "logger_ros2_node"
+
+rclcpp::Node::SharedPtr node_handle;
 
 class LocalNode : public ParameterizedNode
 {
@@ -108,6 +112,7 @@ int main(int argc, char **argv)
 {
 	rclcpp::init(argc, argv);
     auto node = std::make_shared<LocalNode>();
+	node_handle = node;
 	node->start_ros_bag();
     rclcpp::spin(node);
 	node->stop_ros_bag();
