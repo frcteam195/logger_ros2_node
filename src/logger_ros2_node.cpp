@@ -23,8 +23,6 @@
 
 #define NODE_NAME "logger_ros2_node"
 
-rclcpp::Node::SharedPtr node_handle;
-
 class LocalNode : public ParameterizedNode
 {
 public:
