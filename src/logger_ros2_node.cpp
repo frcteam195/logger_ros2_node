@@ -110,7 +110,6 @@ int main(int argc, char **argv)
 {
 	rclcpp::init(argc, argv);
     auto node = std::make_shared<LocalNode>();
-	node_handle = node;
 	node->start_ros_bag();
     rclcpp::spin(node);
 	node->stop_ros_bag();
